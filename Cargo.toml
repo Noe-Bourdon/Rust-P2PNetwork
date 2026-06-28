@@ -1,0 +1,23 @@
+[package]
+name="handson-libp2p-cource-generated-by-ai"
+version="0.0.0"
+edition="2021"
+
+[dependencies.libp2p]
+version="^0.53.2"
+features=[
+	"macros",
+	"mdns",
+	"noise",
+	"ping",
+	"tcp",
+	"tokio",
+	"yamux",
+]
+
+[dependencies.tokio]
+version="^1.37.0"
+features=[
+	"rt-multi-thread",
+	"macros",
+]
