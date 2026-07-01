@@ -13,11 +13,10 @@ features=[
 	"tcp",
 	"tokio",
 	"yamux",
+    "request-response",
+    "gossipsub"
 ]
 
 [dependencies.tokio]
 version="^1.37.0"
-features=[
-	"rt-multi-thread",
-	"macros",
-]
+features = ["full"] 
