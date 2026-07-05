@@ -87,17 +87,20 @@ async fn main(
             }   
 
             event = swarm.select_next_some() => match event {
+
+                libp2p::swarm::SwarmEvent::Behaviour(BehaviourEvent::Mdns(libp2p::mdns::Event::Discovered(e))) => {
+                    for (peer_id, addr) in e {
+                        println!("peer_id: 発見 {} addr {}",peer_id, addr);
+                        swarm.dial(addr)?;
+                    }
+                } 
+
                 SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
                     propagation_source: peer_id,
                     message_id: id,
                     message,
                 })) => {
-                    println!(
-                        "Got message: {} with id: {} from peer: {}",
-                        String::from_utf8_lossy(&message.data),
-                        id,
-                        peer_id
-                    );
+                    println!("メッセージ受信: {} (メッセージID: {}, 送信元: {})",String::from_utf8_lossy(&message.data),id,peer_id);
                 }
                 _ => {}
             }
