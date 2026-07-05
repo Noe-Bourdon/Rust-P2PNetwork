@@ -1,8 +1,12 @@
-use libp2p::futures::{AsyncBufReadExt, StreamExt as _, io};
+use libp2p::futures::{StreamExt as _, io, select};
+use libp2p::swarm::SwarmEvent;
 use std::hash::{Hash, Hasher};
 use std::{error::Error, hash::DefaultHasher};
 use std::time::Duration;
 use libp2p::{gossipsub, request_response};
+
+use tokio::io::BufReader;
+use tokio::io::AsyncBufReadExt;
 struct MyCodec;
 
 #[derive(libp2p::swarm::NetworkBehaviour)]
@@ -65,17 +69,47 @@ async fn main(
     let topic = gossipsub::IdentTopic::new("test-net");
     swarm.behaviour_mut().gossipsub.subscribe(&topic).unwrap();
 
-    let mut stdin = io::BufReader::new(io::stdin()).lines();
 
     println!("peer id {}", swarm.local_peer_id());
 	swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
+
+    let mut lines_from_stdin = BufReader::new(stdin()).lines();
 	loop{
-        let ev = swarm.select_next_some().await;
-        println!("{:#?}",ev);
-        if let libp2p::swarm::SwarmEvent::Behaviour(BehaviourEvent::Mdns(libp2p::mdns::Event::Discovered(e))) =  ev{
-            for (_peer_id, addr) in e {
-                swarm.dial(addr)?;
+        tokio::select! {
+            line = lines_from_stdin.next_line() => {
+                let line = line.unwrap();
+
+                let res = swarm.behaviour_mut().gossipsub.publish(topic.clone(), line.unwrap().as_bytes());
+
+                if let Err(e) = res {
+                    println!("{}", e);
+                }
+            }   
+
+            event = swarm.select_next_some() => match event {
+                SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
+                    propagation_source: peer_id,
+                    message_id: id,
+                    message,
+                })) => {
+                    println!(
+                        "Got message: {} with id: {} from peer: {}",
+                        String::from_utf8_lossy(&message.data),
+                        id,
+                        peer_id
+                    );
+                }
+                _ => {}
             }
+
+            // ev = swarm.select_next_some() => {
+            //     println!("{:#?}",ev);
+            //     if let libp2p::swarm::SwarmEvent::Behaviour(BehaviourEvent::Mdns(libp2p::mdns::Event::Discovered(e))) =  ev{
+            //         for (_peer_id, addr) in e {
+            //             swarm.dial(addr)?;
+            //         }
+            //     }
+            // }
         }
 	}
 }
