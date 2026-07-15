@@ -4,23 +4,39 @@ use std::hash::{Hash, Hasher};
 use std::{error::Error, hash::DefaultHasher};
 use std::time::Duration;
 use libp2p::{gossipsub, request_response};
-
+use tokio::io::stdin;
 use tokio::io::BufReader;
 use tokio::io::AsyncBufReadExt;
+
+#[derive(Clone)]
 struct MyCodec;
+
+#[derive(Debug, Clone)]
+struct MyRequest(Vec<u8>);
+
+#[derive(Debug, Clone)]
+struct MyResponse(Vec<u8>);
 
 #[derive(libp2p::swarm::NetworkBehaviour)]
 struct Behaviour {
     mdns: libp2p::mdns::tokio::Behaviour,
     ping: libp2p::ping::Behaviour,
-    gossipsub: libp2p::gossipsub::Behaviour
+    gossipsub: libp2p::gossipsub::Behaviour,
+    request_response: libp2p::request_response::Behaviour<MyCodec>
 }
 
-use tokio::io::stdin;
+#[derive(Debug, Clone)]
+struct MyProtocol;
+
+impl AsRef<str> for MyProtocol {
+    fn as_ref(&self) -> &str {
+        "/my-chat/1"
+    }
+}
 
 impl Behaviour {
-    pub fn new(mdns: libp2p::mdns::tokio::Behaviour, ping: libp2p::ping::Behaviour, gossipsub: libp2p::gossipsub::Behaviour ) -> Self {
-        Self { mdns, ping, gossipsub }
+    pub fn new(mdns: libp2p::mdns::tokio::Behaviour, ping: libp2p::ping::Behaviour, gossipsub: libp2p::gossipsub::Behaviour, request_response: libp2p::request_response::Behaviour<MyCodec> ) -> Self {
+        Self { mdns, ping, gossipsub, request_response }
     }
 }
 
@@ -59,6 +75,7 @@ async fn main(
                     gossipsub::MessageAuthenticity::Signed(keypair.clone()),
                     gossipsub_config, 
                 ).unwrap();
+                let request_response = request_response::Behaviour::new(MyProtocol, cfg)
                 Behaviour::new(mdns, ping, gossipsub)
 			}
 		)?
@@ -100,6 +117,7 @@ async fn main(
                     message_id: id,
                     message,
                 })) => {
+                    println!("file: {}", file!());
                     println!("メッセージ受信: {} (メッセージID: {}, 送信元: {})",String::from_utf8_lossy(&message.data),id,peer_id);
                 }
                 _ => {}
